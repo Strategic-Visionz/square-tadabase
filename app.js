@@ -131,8 +131,8 @@ async function processNotification(notification) {
                 'field_336': "https://squareup.com/dashboard/sales/transactions/" + payment.order_id, //Open in Square
                 'field_339': '', //Connection - Jobs
                 'field_383': payment.source_type, //Source
-                'field_384': convertCurrency(payment.processing_fee[0].amount_money.amount), //Fees - Total
-                'field_385': calculateFeePercentage(convertCurrency(payment.total_money.amount), convertCurrency(payment.processing_fee[0].amount_money.amount)), //Fee Percent
+                'field_384': getProcessingFeeAmount(payment), //Fees - Total
+                'field_385': calculateFeePercentage(convertCurrency(payment.total_money.amount),getProcessingFeeAmount(payment)), //Fee Percent
             };
 
             // Insert data into Tadabase
@@ -393,15 +393,25 @@ function getSalesTax(order) {
     return 0; // Return 0 if no taxes are applied or if any of the checks fail
 }
 
+function getProcessingFeeAmount(payment) {
+    if (payment && payment.processing_fee && payment.processing_fee.length > 0) {
+        const processingFee = payment.processing_fee[0];
+        if (processingFee && processingFee.amount_money) {
+            return convertCurrency(processingFee.amount_money.amount);
+        }
+    }
+    return 0; // Return 0 if no processing fees are present or if any checks fail
+}
 
-const options = {
-  key: fs.readFileSync('ssl/svweb.dev.key'),
-  cert: fs.readFileSync('ssl/new/8eb5d7f7fac54d65.crt'),
-  ca: fs.readFileSync('ssl/new/gd_bundle-g2-g1.crt')
-};
 
-https.createServer(options, app).listen(3100, () => console.log('HTTPS Server started on port 3010'));
+// const options = {
+//   key: fs.readFileSync('ssl/svweb.dev.key'),
+//   cert: fs.readFileSync('ssl/new/8eb5d7f7fac54d65.crt'),
+//   ca: fs.readFileSync('ssl/new/gd_bundle-g2-g1.crt')
+// };
 
-// app.listen(3000, () => {
-//     console.log('Server is running on port 3000');
-// });
+// https.createServer(options, app).listen(3100, () => console.log('HTTPS Server started on port 3100'));
+
+app.listen(3000, () => {
+    console.log('Server is running on port 3000');
+});
