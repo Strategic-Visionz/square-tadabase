@@ -6,6 +6,7 @@ const SquareClient = require('./squareClient');
 const TadabaseClient = require('./tadabaseClient')
 // const TadabaseClient = require(TadabaseClient)
 require('dotenv').config();
+const https = require('https');
 
 const app = express();
 app.use(express.json());
@@ -383,7 +384,14 @@ function formatDateTime(dateTimeString) {
 }
 
 
+const options = {
+  key: fs.readFileSync('ssl/svweb.dev.key'),
+  cert: fs.readFileSync('ssl/new/8eb5d7f7fac54d65.crt'),
+  ca: fs.readFileSync('ssl/new/gd_bundle-g2-g1.crt')
+};
 
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-});
+https.createServer(options, app).listen(3000, () => console.log('HTTPS Server started on port 3010'));
+
+// app.listen(3000, () => {
+//     console.log('Server is running on port 3000');
+// });
