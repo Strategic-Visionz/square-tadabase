@@ -7,6 +7,7 @@ const TadabaseClient = require('./tadabaseClient')
 // const TadabaseClient = require(TadabaseClient)
 require('dotenv').config();
 const https = require('https');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -117,7 +118,7 @@ async function processNotification(notification) {
              let paymentRecord = {
                 'field_220': paymentId, //Square Payment ID
                 'field_318': new Date(payment.created_at).toISOString(), //Date of Payment
-                'field_320': convertCurrency(payment.total_money.amount), //Total Charge
+                'field_320': convertCurrency(payment?.total_money.amount ?? 0), //Total Charge
                 // 'field_322': '', //First 4 - Formula
                 'field_323': employee,
                 'field_325': paymentMethod, //Payment Method
@@ -149,10 +150,11 @@ async function processNotification(notification) {
                 let catalog_id;
 
                 orders.forEach(async order => { 
-                    gross_sales = convertCurrency(order.gross_sales_money.amount)
-                    discount = convertCurrency(order.total_discount_money.amount)
-                    sales_tax = convertCurrency(order.applied_taxes[0].applied_money.amount)
-                    net_sales = gross_sales - (discount + sales_tax)
+                    let gross_sales = convertCurrency(order?.gross_sales_money?.amount ?? 0)
+                    let discount = convertCurrency(order?.total_discount_money?.amount ?? 0)
+                    let sales_tax = getSalesTax(order);
+                    let net_sales = gross_sales - (discount + sales_tax)
+
 
                     try{
 
@@ -167,12 +169,11 @@ async function processNotification(notification) {
                             ]
                         };
 
-                        console.log("params",params);
 
                         const product = await tadabase.getData('W0VNq8rmlK', params);
 
                         console.log('product: ', product);
-                        if (product && product.items && product.items.length == 0){
+                        if (product && product.length == 0){
                             let productData = {
                                 'field_390': order.catalog_object_id,
                                 'field_362': order.variation_name,
@@ -189,7 +190,6 @@ async function processNotification(notification) {
                         console.log('error: ', e)
                     }
     
-                    console.log("cat: ", catalog_id);
                     // Prepare revenue details data for Tadabase
                     let revenueDetails = {
                         'field_340': new Date(payment.created_at).toISOString(), //Date
@@ -383,6 +383,16 @@ function formatDateTime(dateTimeString) {
     return new Date(dateTimeString).toISOString();
 }
 
+function getSalesTax(order) {
+    if (order && order.applied_taxes && order.applied_taxes.length > 0) {
+        const appliedTax = order.applied_taxes[0];
+        if (appliedTax && appliedTax.applied_money) {
+            return convertCurrency(appliedTax.applied_money.amount);
+        }
+    }
+    return 0; // Return 0 if no taxes are applied or if any of the checks fail
+}
+
 
 const options = {
   key: fs.readFileSync('ssl/svweb.dev.key'),
@@ -390,7 +400,7 @@ const options = {
   ca: fs.readFileSync('ssl/new/gd_bundle-g2-g1.crt')
 };
 
-https.createServer(options, app).listen(3000, () => console.log('HTTPS Server started on port 3010'));
+https.createServer(options, app).listen(3100, () => console.log('HTTPS Server started on port 3010'));
 
 // app.listen(3000, () => {
 //     console.log('Server is running on port 3000');
