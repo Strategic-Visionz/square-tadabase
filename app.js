@@ -103,14 +103,26 @@ async function processNotification(notification) {
             const timestamp = formatDateTime(payment.created_at);
 
             // Determine payment method and device details
-            let paymentMethod, deviceDetails;
+            
+            let paymentMethod, deviceDetails, card_brand, entry_method, last_4;
             if (payment.card_details) {
                 paymentMethod = `${payment.card_details.card.card_type} ${payment.source_type}`;
                 deviceDetails = payment.card_details.device_details.device_name;
+                card_brand = payment.card_details.card.card_brand;
+                entry_method = payment.card_details.entry_method;
+                last_4 = payment.card_details.card.last_4;
+
+            } else if (payment.device_details) {
+                paymentMethod = `${payment.external_details.type}`;
+                deviceDetails = payment.device_details.device_name;
+
+            } else if (payment.cash_details) {
+                paymentMethod = 'CASH';
+                deviceDetails = payment.device_details.device_name;
+
             } else {
-                // Adjust this part based on other payment types like 'CHECK', 'CASH', etc.
-                paymentMethod = 'OTHER';
-                deviceDetails = payment.device_details?.device_name || 'N/A';
+                paymentMethod = 'CUSTOM';
+                deviceDetails = payment.wallet_details.device_details.device_name;
             }
 
 
@@ -124,9 +136,9 @@ async function processNotification(notification) {
                 'field_325': paymentMethod, //Payment Method
                 // 'field_327': '', //Payment Info Formula
                 // 'field_330': '', //Reference Only - Date as Text
-                'field_331': payment.card_details.card.card_brand, //Credit Card Brand
-                'field_332': payment.card_details.entry_method, //Entry Method
-                'field_333': payment.card_details.card.last_4, //PAN Suffix
+                'field_331': card_brand, //Credit Card Brand
+                'field_332': entry_method, //Entry Method
+                'field_333': last_4, //PAN Suffix
                 'field_334': deviceDetails, //Device Name
                 'field_336': "https://squareup.com/dashboard/sales/transactions/" + payment.order_id, //Open in Square
                 'field_339': '', //Connection - Jobs
@@ -226,38 +238,41 @@ async function processNotification(notification) {
             }
            
 
-            const paymentDetails = await square.getPaymentDetails(payment.id);
+            if (payment.card_details){ //Just a condition to call payment details if card payments
+                const paymentDetails = await square.getPaymentDetails(payment.id);
 
-            tips = convertCurrency(paymentDetails.payment?.tip_money?.amount ?? 0);
-
-            if (tips > 0){
-                let tipsRecords = {
-                    'field_340': new Date(payment.created_at).toISOString(), //Date
-                    'field_388': new Date(payment.created_at).toISOString(), //Time
-                    'field_391': 'Square', //Source
-                    'field_341': employee,
-                    'field_386': 'Tips', //Category
-                    'field_387': 'Tips', //Item
-                    'field_344': '', //Qty
-                    'field_393': '', //Price Point Name
-                    'field_346': '', //SKU
-                    'field_347': '', //Modifiers Applied
-                    'field_348': '', //Gross Sales
-                    'field_349': '', //Discounts
-                    'field_350': '', //Net Sales
-                    'field_351': '', //Sales Tax
-                    'field_352': convertCurrency(paymentDetails.payment?.tip_money?.amount ?? 0), //Tips
-                    'field_353': payment.order_id, //Transaction ID
-                    'field_282': savedPaymentID.recordId, //Connection - Square Payment ID
-                    'field_354': deviceDetails, //Device Name
-                    'field_356':  "https://squareup.com/dashboard/sales/transactions/" + payment.order_id, //Details Link to Square
-                    'field_363': '', //Connection - Product Item Catalog
-                    'field_364': '', //Connection - Jobs
-                };
+                tips = convertCurrency(paymentDetails.payment?.tip_money?.amount ?? 0);
     
-                // Insert data into Tadabase
-                await tadabase.insertData('l5nQxLQxYX', tipsRecords);
-            }            
+                if (tips > 0){
+                    let tipsRecords = {
+                        'field_340': new Date(payment.created_at).toISOString(), //Date
+                        'field_388': new Date(payment.created_at).toISOString(), //Time
+                        'field_391': 'Square', //Source
+                        'field_341': employee,
+                        'field_386': 'Tips', //Category
+                        'field_387': 'Tips', //Item
+                        'field_344': '', //Qty
+                        'field_393': '', //Price Point Name
+                        'field_346': '', //SKU
+                        'field_347': '', //Modifiers Applied
+                        'field_348': '', //Gross Sales
+                        'field_349': '', //Discounts
+                        'field_350': '', //Net Sales
+                        'field_351': '', //Sales Tax
+                        'field_352': convertCurrency(paymentDetails.payment?.tip_money?.amount ?? 0), //Tips
+                        'field_353': payment.order_id, //Transaction ID
+                        'field_282': savedPaymentID.recordId, //Connection - Square Payment ID
+                        'field_354': deviceDetails, //Device Name
+                        'field_356':  "https://squareup.com/dashboard/sales/transactions/" + payment.order_id, //Details Link to Square
+                        'field_363': '', //Connection - Product Item Catalog
+                        'field_364': '', //Connection - Jobs
+                    };
+        
+                    // Insert data into Tadabase
+                    await tadabase.insertData('l5nQxLQxYX', tipsRecords);
+                }    
+            }
+                    
            
 
             if (discounts > 0){
@@ -404,14 +419,14 @@ function getProcessingFeeAmount(payment) {
 }
 
 
-// const options = {
-//   key: fs.readFileSync('ssl/svweb.dev.key'),
-//   cert: fs.readFileSync('ssl/new/8eb5d7f7fac54d65.crt'),
-//   ca: fs.readFileSync('ssl/new/gd_bundle-g2-g1.crt')
-// };
+const options = {
+  key: fs.readFileSync('ssl/svweb.dev.key'),
+  cert: fs.readFileSync('ssl/new/8eb5d7f7fac54d65.crt'),
+  ca: fs.readFileSync('ssl/new/gd_bundle-g2-g1.crt')
+};
 
-// https.createServer(options, app).listen(3100, () => console.log('HTTPS Server started on port 3100'));
+https.createServer(options, app).listen(3100, () => console.log('HTTPS Server started on port 3100'));
 
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-});
+// app.listen(3000, () => {
+//     console.log('Server is running on port 3000');
+// });
